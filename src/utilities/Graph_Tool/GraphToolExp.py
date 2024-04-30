@@ -16,6 +16,7 @@ import _pickle as cPickle
 import graph_tool.all as gt
 import numpy as np
 import pandas as pd
+import sys
 
 # ploting libs
 import plotly.express as px
@@ -24,10 +25,12 @@ from matplotlib import pyplot as plt
 from plotly.subplots import make_subplots
 
 # custom library
-from ..PGCNA_Stats.PGCNA_Output import PGCNAOutput
+sys.path.append('/Users/vlad/Documents/Code/York/iNet_v2/src/')
+# from ..PGCNA_Stats. import NetworkOutput
+from NetworkAnalysis.ExperimentSet import NetworkOutput
 
 
-class GraphToolExperiment(PGCNAOutput):
+class GraphToolExperiment(NetworkOutput):
 
     com_df: pd.DataFrame
     gt_modCon: dict
@@ -40,18 +43,18 @@ class GraphToolExperiment(PGCNAOutput):
     hstateObj: dict
     states: list
 
-    def __init__(self, exp: PGCNAOutput, rel_path=""):
+    def __init__(self, exp: NetworkOutput, rel_path=""):
         super().__init__(exp.graph, exp.exp_meta, exp.mut_df, exp.exps_path, rel_path)
 
     @classmethod
-    def from_pgcna_exp(cls, exp: PGCNAOutput, rel_path="../"):
+    def from_pgcna_exp(cls, exp: NetworkOutput, rel_path="../"):
         obj = cls.__new__(cls)
         super(GraphToolExperiment, obj).__init__(exp.graph, exp.exp_meta, exp.mut_df, exp.exps_path, rel_path=rel_path)
         obj._value = exp
         return obj
 
     @classmethod
-    def from_pgcna_inet(cls, exp: PGCNAOutput, rel_path="../"):
+    def from_pgcna_inet(cls, exp: NetworkOutput, rel_path="../"):
         obj = cls.__new__(cls)
         super(GraphToolExperiment, obj).__init__(exp.graph, exp.exp_meta, exp.mut_df, exp.exps_path, rel_path=rel_path, exp_type="iNet", base_path=exp.base_path)
 
@@ -198,7 +201,7 @@ class GraphToolExperiment(PGCNAOutput):
         vb, eb = gt.betweenness(self.gt_g)
         self.pos = pos
 
-    # overriding the method from the PGCNAOutput
+    # overriding the method from the NetworkOutput
     def get_ModCon(self, state=0, com_df = None):
         if self.sbm_method == 'sbm':
             if com_df is None:
