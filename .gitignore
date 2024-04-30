@@ -2,7 +2,10 @@
 
 data/
 results/
-
+selective_edge_pruning/
+tum_modifiers/
+p0_modifiers/
+network_vs_clustering/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
