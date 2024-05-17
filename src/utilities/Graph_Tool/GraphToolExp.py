@@ -273,16 +273,17 @@ class GraphToolExperiment(NetworkOutput):
         state = self.states[state_idx]
         max_part = state["pmode"].get_B()
         num_nodes = gt_g.num_vertices()
-
-        part_nodes = np.zeros((num_nodes, max_part + 1))
+        
+        part_nodes = np.zeros((num_nodes, max_part + 2))
         genes = []
         for node in gt_g.iter_vertices():
             genes.append(gt_g.vp.gene[node])
             frac = np.array(gt_g.vp["marginal"][node])
             part_nodes[node, : frac.shape[0]] = frac
+            part_nodes[node, -2] = node
             part_nodes[node, -1] = int(gt_g.vp["max_b"][node]) # offset to start from 0
 
-        col_names = ["b_{}".format(idx) for idx in range(0, max_part)] + ["max_b"]
+        col_names = ["b_{}".format(idx) for idx in range(0, max_part)] + ['node_idx', 'max_b']
         com_df = pd.DataFrame(part_nodes, columns=col_names, index=genes)
 
         self.com_df = com_df
@@ -896,7 +897,11 @@ class GraphToolExperiment(NetworkOutput):
             neighbors.append(idx)
 
         # Show the community where is the gene we seek
-        for idx in np.nditer(np.where(graph.vp["max_b"].a == com)):
+        max_b = np.array(list(graph.vp["max_b"])) #
+        # For hSBM and newer exp it works graph.vp["max_b"] 
+        #  but for SBM and the control experiments it doesn't 
+        #  so I had to explicitly transfer the VP of max_b in a numpy array
+        for idx in np.nditer(np.where(max_b == com)):
             vp_bool[idx] = True
 
         vp_bool[gene_idx] = True
@@ -910,6 +915,8 @@ class GraphToolExperiment(NetworkOutput):
         neigbhors_df = nodes_df[nodes_df["node_idx"].isin(v_idxs)][["max_b", "count", "TF"]]
 
         stats_neigbhor = []
+        neighbors_genes = pd.DataFrame()
+
         for com in neigbhors_df["max_b"].unique():
             sel_com = neigbhors_df[neigbhors_df["max_b"] == com]
             com_size = nodes_df[nodes_df["max_b"] == com].shape[0]
@@ -920,12 +927,13 @@ class GraphToolExperiment(NetworkOutput):
             com_ratio = round(sel_com.shape[0] / com_size, 4)
 
             stats_neigbhor.append((com, com_ratio, mut_burden, num_tf, sel_com.shape[0], com_size))
+            neighbors_genes = pd.concat([neighbors_genes, sel_com], axis=0)
 
         stats_neigbhor = pd.DataFrame(stats_neigbhor, columns=["com", "com_ratio", "mut_burden", "num_TF", "num_found", "com_size"])
         stats_neigbhor = stats_neigbhor.sort_values(by=["num_found"], ascending=False)
         stats_neigbhor["com"] = stats_neigbhor["com"].astype(str)
 
-        return stats_neigbhor
+        return stats_neigbhor, neighbors_genes
 
     def plot_overview_gene(self, gene_name: str):
 
