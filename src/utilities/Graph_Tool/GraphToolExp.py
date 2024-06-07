@@ -879,7 +879,7 @@ class GraphToolExperiment(NetworkOutput):
             if self.gt_g.vp["gene"][v] == gene:
                 return v, self.gt_g.vp['max_b'][v]
 
-    def filter_graph(self, gene: str):
+    def filter_graph(self, gene: str, show_own_com=True):
 
         graph = self.gt_g
         # Clear the previous filter
@@ -897,12 +897,13 @@ class GraphToolExperiment(NetworkOutput):
             neighbors.append(idx)
 
         # Show the community where is the gene we seek
-        max_b = np.array(list(graph.vp["max_b"])) #
-        # For hSBM and newer exp it works graph.vp["max_b"] 
-        #  but for SBM and the control experiments it doesn't 
-        #  so I had to explicitly transfer the VP of max_b in a numpy array
-        for idx in np.nditer(np.where(max_b == com)):
-            vp_bool[idx] = True
+        if show_own_com:
+            max_b = np.array(list(graph.vp["max_b"])) #
+            # For hSBM and newer exp it works graph.vp["max_b"] 
+            #  but for SBM and the control experiments it doesn't 
+            #  so I had to explicitly transfer the VP of max_b in a numpy array
+            for idx in np.nditer(np.where(max_b == com)):
+                vp_bool[idx] = True
 
         vp_bool[gene_idx] = True
         graph.set_vertex_filter(vp_bool)
@@ -1063,17 +1064,17 @@ class GraphToolExperiment(NetworkOutput):
         subplot = subplot.update_yaxes(title_text=config["y_title"])
 
         # Remove duplicate legend items
-        # visited = []
-        # for trace in subplot["data"]:
-        #     if trace["name"] is None:
-        #         continue
+        visited = []
+        for trace in subplot["data"]:
+            if trace["name"] is None:
+                continue
 
-        #     trace["name"] = trace["name"].split(",")[0]
-        #     if trace["name"] not in visited:
-        #         trace["showlegend"] = True
-        #         visited.append(trace["name"])
-        #     else:
-        #         trace["showlegend"] = False
+            trace["name"] = trace["name"].split(",")[0]
+            if trace["name"] not in visited:
+                trace["showlegend"] = True
+                visited.append(trace["name"])
+            else:
+                trace["showlegend"] = False
 
         return subplot
 
