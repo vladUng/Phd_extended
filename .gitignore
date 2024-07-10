@@ -7,6 +7,8 @@ tum_modifiers/
 p0_modifiers/
 network_vs_clustering/
 
+validation/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

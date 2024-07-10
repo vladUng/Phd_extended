@@ -10,9 +10,9 @@
     "editor.formatOnPaste": true,
     "python.languageServer": "Default",
     "pylint.interpreter": [
-        "/Users/vlad/opt/anaconda3/envs/iNet_gt2/bin/python"
+        "/Users/vlad/opt/anaconda3/envs/iNet_gt/bin/python"
     ],
     "black-formatter.interpreter": [
-        "/Users/vlad/opt/anaconda3/envs/iNet_gt2/bin/python"
+        "/Users/vlad/opt/anaconda3/envs/iNet_gt/bin/python"
     ]
 }
