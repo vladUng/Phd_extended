@@ -9,6 +9,10 @@ network_vs_clustering/
 
 validation/
 
+standard/
+tissue_diff/
+non_tum_split/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
