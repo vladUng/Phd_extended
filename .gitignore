@@ -13,6 +13,7 @@ standard/
 tissue_diff/
 non_tum_split/
 norm_non_tum_split/
+reward/
 
 
 # Byte-compiled / optimized / DLL files
