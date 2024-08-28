@@ -15,6 +15,9 @@ non_tum_split/
 norm_non_tum_split/
 reward/
 
+*.pptx
+network_pipeline.png
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
