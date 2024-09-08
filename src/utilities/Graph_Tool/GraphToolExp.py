@@ -273,7 +273,7 @@ class GraphToolExperiment(NetworkOutput):
         state = self.states[state_idx]
         max_part = state["pmode"].get_B()
         num_nodes = gt_g.num_vertices()
-        
+
         part_nodes = np.zeros((num_nodes, max_part + 2))
         genes = []
         for node in gt_g.iter_vertices():
@@ -848,7 +848,7 @@ class GraphToolExperiment(NetworkOutput):
             "bmi",
             "KMeans_labels_6",
             "2019_consensus_classifier",
-            "TCGA_2017_AM_remap",
+            "TCGA408_classifier",
         ]
 
         # Selecting only the present mutations
@@ -899,8 +899,8 @@ class GraphToolExperiment(NetworkOutput):
         # Show the community where is the gene we seek
         if show_own_com:
             max_b = np.array(list(graph.vp["max_b"])) #
-            # For hSBM and newer exp it works graph.vp["max_b"] 
-            #  but for SBM and the control experiments it doesn't 
+            # For hSBM and newer exp it works graph.vp["max_b"]
+            #  but for SBM and the control experiments it doesn't
             #  so I had to explicitly transfer the VP of max_b in a numpy array
             for idx in np.nditer(np.where(max_b == com)):
                 vp_bool[idx] = True
