@@ -16,7 +16,7 @@ norm_non_tum_split/
 reward/
 
 gene_selection/
-
+sel_pruning_v2/
 
 *.pptx
 network_pipeline.png
