@@ -9,10 +9,10 @@
     "editor.formatOnSave": false,
     "editor.formatOnPaste": true,
     "python.languageServer": "Default",
-    "pylint.interpreter": [
-        "/Users/vlad/opt/anaconda3/envs/iNet_gt/bin/python"
+    "python.autoComplete.extraPaths": [
+        "/Users/vlad/Developer/York/iNet_v2/src/"
     ],
-    "black-formatter.interpreter": [
-        "/Users/vlad/opt/anaconda3/envs/iNet_gt/bin/python"
+    "python.analysis.include": [
+        "/Users/vlad/Developer/York/iNet_v2/src/"
     ]
 }

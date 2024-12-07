@@ -25,7 +25,7 @@ from matplotlib import pyplot as plt
 from plotly.subplots import make_subplots
 
 # custom library
-sys.path.append('/Users/vlad/Documents/Code/York/iNet_v2/src/')
+sys.path.append('/Users/vlad/Developer/York/iNet_v2/src/')
 # from ..PGCNA_Stats. import NetworkOutput
 from NetworkAnalysis.ExperimentSet import NetworkOutput
 
