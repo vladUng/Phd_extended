@@ -21,6 +21,7 @@ gene_selection/
 sel_pruning_v2/
 
 controls/
+ctrls_tum/
 
 *.pptx
 network_pipeline.png
