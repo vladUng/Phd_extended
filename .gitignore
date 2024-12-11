@@ -22,6 +22,7 @@ sel_pruning_v2/
 
 controls/
 ctrls_tum/
+tum_sel_pruning/
 
 *.pptx
 network_pipeline.png
