@@ -1,0 +1,364 @@
+# Load the libraries
+
+This is an adapted version of the work from [Marzouka & Pontus](https://github.com/NourMarzouka/multiclassPairs)
+
+```{r}
+library(multiclassPairs)
+library(leukemiasEset, quietly = TRUE) 
+
+data(leukemiasEset) 
+knitr::kable(table(pData(leukemiasEset)[,"LeukemiaType"]))
+
+path <- '~/Developer/York/R/98TFs/98TFs_subtypes_aggFiltering_gc42.tsv'
+
+# Step 1: Read the CSV file
+tpms_df <- read.csv(file = path, header = TRUE, sep = '\t')
+
+# Step 2: Set the 'Sample' column as row names
+samples <- tpms_df$Sample
+
+# Step 3: Remove the 'Sample' column
+tpms_df <- tpms_df[, !colnames(tpms_df) %in% "Sample"]
+rownames(tpms_df) <- samples
+
+dendrogram_cut <- tpms_df$dendrogram_cut
+dendrogram_label <- tpms_df$dendrogram_label
+
+# Step 4: Separate gene expression data and subtype labels
+gene_data <- tpms_df[, !colnames(tpms_df) %in% c("dendrogram_cut", "dendrogram_label")]
+
+# Verify that row names of gene_data match tpms_df
+head(rownames(gene_data))  # Should match the sample names
+
+# Transpose the gene_data to make samples columns and genes rows
+gene_data <- t(gene_data)
+
+```
+
+# Prep
+
+## Filter the datasets
+
+```{r}
+
+classifier_label <-'dendrogram_label'
+unique_classes <- unique(tpms_df[[classifier_label]])
+
+# Step 2: Extract class labels
+# Use 'dendrogram_cut' as the class labels
+class_labels <- as.factor(tpms_df[[classifier_label]])
+
+# Check dimensions to confirm alignment
+if (ncol(gene_data) != length(class_labels)) {
+  stop("Number of samples in 'gene_data' and 'class_labels' do not match after transposing.")
+}
+
+# Step 3: Create the data object without platform labels
+data_object <- ReadData(Data = gene_data,
+                        Labels = class_labels,
+                        verbose = FALSE)
+
+# View the created object
+print(data_object)
+
+
+```
+
+```{r}
+
+# Use your dataset
+usedDataset <- gene_data
+
+# Get the number of samples (columns)
+n <- ncol(usedDataset)
+
+# Set seed for reproducibility
+set.seed(1234)
+
+# Step 1: Split samples into training (60%) and testing (40%)
+training_samples <- sample(1:n, size = floor(n * 0.6))
+
+# Create training and testing sets with first 1000 genes (rows)
+train <- usedDataset[1:1000, training_samples]
+test <- usedDataset[1:1000, -training_samples]
+
+# Step 2: Ensure no shared samples between training and testing sets
+# Here, columns represent samples, so we check the column names
+shared_samples <- sum(colnames(test) %in% colnames(train)) == 0
+
+train_object <- ReadData(Data = train,
+                         Labels = train_labels,
+                         verbose = TRUE)
+
+# Print the check result
+if (shared_samples) {
+  cat("No shared samples between training and testing datasets. Splits are clean.\n")
+} else {
+  cat("Warning: Shared samples exist between training and testing datasets.\n")
+}
+
+```
+
+## Gene filtering
+
+Using option 2 with Dunn's test on ranked that as it was recommended to give more weight to small subgroups
+
+```{r message=TRUE, warning=TRUE}
+
+# let's go with gene filtering using one_vs_one option
+# for featureNo argument, a sufficient number of returned features is 
+# recommended if large number of rules is used in the downstream training steps.
+filtered_genes <- filter_genes_TSP(data_object = train_object,
+                                   filter = "one_vs_one",
+                                   platform_wise = FALSE,
+                                   featureNo = 1000,
+                                   UpDown = TRUE,
+                                   verbose = TRUE)
+filtered_genes
+
+```
+
+# Model training
+
+```{r}
+
+# Let's train our model
+classifier <- train_one_vs_rest_TSP(data_object = train_object,
+                                    filtered_genes = filtered_genes,
+                                    k_range = 5:50,
+                                    include_pivot = FALSE,
+                                    one_vs_one_scores = TRUE,
+                                    platform_wise_scores = FALSE,
+                                    seed = 1234,
+                                    verbose = FALSE)
+classifier
+
+```
+
+# Prediction
+
+## Initial test
+
+```{r}
+
+# apply on the training data
+# To have the classes in output in specific order, we can use classes argument
+results_train <- predict_one_vs_rest_TSP(classifier = classifier,
+                                         Data = train_object,
+                                         tolerate_missed_genes = TRUE,
+                                         weighted_votes = TRUE,
+                                         classes =  unique_classes,
+                                         verbose = TRUE)
+
+# apply on the testing data
+results_test <- predict_one_vs_rest_TSP(classifier = classifier,
+                                        Data = test,
+                                        tolerate_missed_genes = TRUE,
+                                        weighted_votes = TRUE,
+                                        classes= unique_classes,
+                                        verbose = TRUE)
+# get a look over the scores in the testing data
+knitr::kable(head(results_test))
+
+```
+
+## Accuracy
+
+```{r}
+
+# Confusion Matrix and Statistics on training data
+caret::confusionMatrix(data = factor(results_train$max_score, 
+                                     levels = unique_classes),
+                       reference = factor(train_object$data$Labels, 
+                                          levels = unique_classes),
+                       mode="everything")
+```
+
+## Confusion matrix
+
+```{r}
+
+# Extract sample names from the columns of the test object
+# Step 1: Extract sample names from the columns of the test object
+test_samples <- colnames(test)
+
+# Step 2: Extract the labels for these samples from tpms_df
+test_labels <- tpms_df[test_samples, classifier_label]
+
+# Step 3: Convert test_labels to a factor with the correct levels
+test_labels <- as.factor(test_labels)
+
+# Step 4: Ensure predicted_labels has the same levels as test_labels
+common_levels <- union(levels(test_labels), unique(train_object$Labels))
+
+test_labels <- factor(test_labels, levels = common_levels)
+predicted_labels <- factor(results_test$max_score, levels = common_levels)
+
+# Step 5: Compute the confusion matrix
+confusion_matrix <- caret::confusionMatrix(data = predicted_labels,
+                                           reference = test_labels,
+                                           mode = "everything")
+
+# Print the confusion matrix
+print(confusion_matrix)
+
+
+```
+
+## Visusalisation
+
+### Train data
+
+```{r}
+
+# plot for the rules and scores in the training data
+plot_binary_TSP(Data = train_object, # we are using the data object here
+                classifier = classifier, 
+                prediction = results_train, 
+                classes = unique_classes,
+                #margin = c(0,5,0,10),
+                title = "Training data")
+
+```
+
+### Test data
+
+```{r}
+
+# plot for the rules and scores in the testing data
+plot_binary_TSP(Data = test, # ExpressionSet
+                ref=test_labels,
+                classifier = classifier, 
+                prediction = results_test, 
+                classes = unique_classes,
+                title = "Testing data"#, 
+                #margin = c(0,5,0,10)
+                )
+
+```
+
+# Randomn forest
+
+
+## Reducing the number of genes
+
+```{r}
+
+# (500 trees here just for fast example)
+genes_RF <- sort_genes_RF(data_object = train_object,
+                          # featureNo_altogether, it is better not to specify a number here
+                          # featureNo_one_vs_rest, it is better not to specify a number here
+                          rank_data = TRUE,
+                          platform_wise = FALSE,
+                          num.trees = 500, # more features, more tress are recommended
+                          seed=123456, # for reproducibility
+                          verbose = TRUE)
+genes_RF # sorted genes object
+
+# to get an idea of how many genes we will use
+# and how many rules will be generated
+summary_genes <- summary_genes_RF(sorted_genes_RF = genes_RF,
+                                  genes_altogether = c(10,20,50,100,150,200),
+                                  genes_one_vs_rest = c(10,20,50,100,150,200))
+knitr::kable(summary_genes)
+```
+
+## Sort rules 
+
+```{r}
+
+rules_RF <- sort_rules_RF(data_object = train_object, 
+                          sorted_genes_RF = genes_RF,
+                          genes_altogether = 50,
+                          genes_one_vs_rest = 50, 
+                          num.trees = 500,# more rules, more tress are recommended 
+                          seed=123456,
+                          verbose = TRUE)
+rules_RF # sorted rules object
+
+```
+
+## Model training
+
+```{r}
+
+
+parameters <- data.frame(
+  gene_repetition=c(3,2,1),
+  rules_one_vs_rest=c(2,3,10),
+  rules_altogether=c(2,3,10),
+  run_boruta=c(FALSE,"make_error",TRUE), # I want to produce error in the 2nd trial
+  plot_boruta = FALSE,
+  num.trees=c(100,200,300),
+  stringsAsFactors = FALSE)
+
+# parameters
+# for overall and byclass possible options, check the help files
+para_opt <- optimize_RF(data_object = train_object,
+                        sorted_rules_RF = rules_RF,
+                        parameters = parameters,
+                        test_object = NULL,
+                        overall = c("Accuracy","Kappa"), # wanted overall measurements 
+                        byclass = c("F1"), # wanted measurements per class
+                        verbose = TRUE)
+
+para_opt # results object
+# para_opt$summary # the df of with summarized information
+knitr::kable(para_opt$summary)
+
+```
+
+## Actual training
+```{r}
+
+RF_classifier <- train_RF(data_object = train_object,
+                          sorted_rules_RF = rules_RF,
+                          gene_repetition = 1,
+                          rules_altogether = 10,
+                          rules_one_vs_rest = 10,
+                          run_boruta = TRUE, 
+                          plot_boruta = FALSE,
+                          probability = TRUE,
+                          num.trees = 300,
+                          boruta_args = list(),
+                          verbose = TRUE)
+
+```
+
+
+
+```{r}
+
+# plot proximity matrix of the out-of-bag samples
+# Note: this takes a lot of time if the data is big
+proximity_matrix_RF(object = train_object,
+             classifier = RF_classifier, 
+             plot = TRUE,
+             return_matrix = FALSE, # if we need to get the matrix itself
+             title = "Leukemias",
+             cluster_cols = TRUE)
+
+```
+## Training accuracy
+
+```{r}
+
+# training accuracy
+# get the prediction labels from the trained model
+# if the classifier trained using probability   = FALSE
+training_pred <- RF_classifier$RF_scheme$RF_classifier$predictions
+if (is.factor(training_pred)) {
+  x <- as.character(training_pred)
+}
+
+# if the classifier trained using probability   = TRUE
+if (is.matrix(training_pred)) {
+  x <- colnames(training_pred)[max.col(training_pred)]
+}
+
+# training accuracy
+caret::confusionMatrix(data =factor(x),
+                       reference = factor(train_object$data$Labels),
+                       mode = "everything")
+
+```
