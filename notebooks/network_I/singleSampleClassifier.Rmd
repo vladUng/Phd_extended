@@ -82,6 +82,9 @@ training_samples <- sample(1:n, size = floor(n * 0.6))
 train <- usedDataset[1:1000, training_samples]
 test <- usedDataset[1:1000, -training_samples]
 
+test_labels <- class_labels[-training_samples]
+train_labels <- class_labels[training_samples]
+
 # Step 2: Ensure no shared samples between training and testing sets
 # Here, columns represent samples, so we check the column names
 shared_samples <- sum(colnames(test) %in% colnames(train)) == 0
@@ -109,7 +112,7 @@ Using option 2 with Dunn's test on ranked that as it was recommended to give mor
 # for featureNo argument, a sufficient number of returned features is 
 # recommended if large number of rules is used in the downstream training steps.
 filtered_genes <- filter_genes_TSP(data_object = train_object,
-                                   filter = "one_vs_one",
+                                   filter = "one_vs_rest",
                                    platform_wise = FALSE,
                                    featureNo = 1000,
                                    UpDown = TRUE,
@@ -191,7 +194,7 @@ test_labels <- as.factor(test_labels)
 # Step 4: Ensure predicted_labels has the same levels as test_labels
 common_levels <- union(levels(test_labels), unique(train_object$Labels))
 
-test_labels <- factor(test_labels, levels = common_levels)
+# test_labels <- factor(test_labels, levels = common_levels)
 predicted_labels <- factor(results_test$max_score, levels = common_levels)
 
 # Step 5: Compute the confusion matrix
@@ -205,9 +208,9 @@ print(confusion_matrix)
 
 ```
 
-## Visusalisation
+# Visusalisation
 
-### Train data
+## Train data
 
 ```{r}
 
@@ -221,7 +224,7 @@ plot_binary_TSP(Data = train_object, # we are using the data object here
 
 ```
 
-### Test data
+## Test data
 
 ```{r}
 
@@ -237,128 +240,5 @@ plot_binary_TSP(Data = test, # ExpressionSet
 
 ```
 
-# Randomn forest
 
 
-## Reducing the number of genes
-
-```{r}
-
-# (500 trees here just for fast example)
-genes_RF <- sort_genes_RF(data_object = train_object,
-                          # featureNo_altogether, it is better not to specify a number here
-                          # featureNo_one_vs_rest, it is better not to specify a number here
-                          rank_data = TRUE,
-                          platform_wise = FALSE,
-                          num.trees = 500, # more features, more tress are recommended
-                          seed=123456, # for reproducibility
-                          verbose = TRUE)
-genes_RF # sorted genes object
-
-# to get an idea of how many genes we will use
-# and how many rules will be generated
-summary_genes <- summary_genes_RF(sorted_genes_RF = genes_RF,
-                                  genes_altogether = c(10,20,50,100,150,200),
-                                  genes_one_vs_rest = c(10,20,50,100,150,200))
-knitr::kable(summary_genes)
-```
-
-## Sort rules 
-
-```{r}
-
-rules_RF <- sort_rules_RF(data_object = train_object, 
-                          sorted_genes_RF = genes_RF,
-                          genes_altogether = 50,
-                          genes_one_vs_rest = 50, 
-                          num.trees = 500,# more rules, more tress are recommended 
-                          seed=123456,
-                          verbose = TRUE)
-rules_RF # sorted rules object
-
-```
-
-## Model training
-
-```{r}
-
-
-parameters <- data.frame(
-  gene_repetition=c(3,2,1),
-  rules_one_vs_rest=c(2,3,10),
-  rules_altogether=c(2,3,10),
-  run_boruta=c(FALSE,"make_error",TRUE), # I want to produce error in the 2nd trial
-  plot_boruta = FALSE,
-  num.trees=c(100,200,300),
-  stringsAsFactors = FALSE)
-
-# parameters
-# for overall and byclass possible options, check the help files
-para_opt <- optimize_RF(data_object = train_object,
-                        sorted_rules_RF = rules_RF,
-                        parameters = parameters,
-                        test_object = NULL,
-                        overall = c("Accuracy","Kappa"), # wanted overall measurements 
-                        byclass = c("F1"), # wanted measurements per class
-                        verbose = TRUE)
-
-para_opt # results object
-# para_opt$summary # the df of with summarized information
-knitr::kable(para_opt$summary)
-
-```
-
-## Actual training
-```{r}
-
-RF_classifier <- train_RF(data_object = train_object,
-                          sorted_rules_RF = rules_RF,
-                          gene_repetition = 1,
-                          rules_altogether = 10,
-                          rules_one_vs_rest = 10,
-                          run_boruta = TRUE, 
-                          plot_boruta = FALSE,
-                          probability = TRUE,
-                          num.trees = 300,
-                          boruta_args = list(),
-                          verbose = TRUE)
-
-```
-
-
-
-```{r}
-
-# plot proximity matrix of the out-of-bag samples
-# Note: this takes a lot of time if the data is big
-proximity_matrix_RF(object = train_object,
-             classifier = RF_classifier, 
-             plot = TRUE,
-             return_matrix = FALSE, # if we need to get the matrix itself
-             title = "Leukemias",
-             cluster_cols = TRUE)
-
-```
-## Training accuracy
-
-```{r}
-
-# training accuracy
-# get the prediction labels from the trained model
-# if the classifier trained using probability   = FALSE
-training_pred <- RF_classifier$RF_scheme$RF_classifier$predictions
-if (is.factor(training_pred)) {
-  x <- as.character(training_pred)
-}
-
-# if the classifier trained using probability   = TRUE
-if (is.matrix(training_pred)) {
-  x <- colnames(training_pred)[max.col(training_pred)]
-}
-
-# training accuracy
-caret::confusionMatrix(data =factor(x),
-                       reference = factor(train_object$data$Labels),
-                       mode = "everything")
-
-```
