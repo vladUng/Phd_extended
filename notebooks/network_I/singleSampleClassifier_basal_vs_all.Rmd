@@ -2,14 +2,12 @@
 
 This is an adapted version of the work from [Marzouka & Pontus](https://github.com/NourMarzouka/multiclassPairs)
 
+Compared with the other notebook, I am using more samples and basal_vs_all
+
 ```{r}
 library(multiclassPairs)
-library(leukemiasEset, quietly = TRUE) 
 
-data(leukemiasEset) 
-knitr::kable(table(pData(leukemiasEset)[,"LeukemiaType"]))
-
-path <- '~/Developer/York/R/98TFs/98TFs_subtypes_aggFiltering_gc42.tsv'
+path <- '~/Developer/York/R/98TFs/98TFs_subtypes_aggFiltering_basal_vs_all_gc42.tsv'
 
 # Step 1: Read the CSV file
 tpms_df <- read.csv(file = path, header = TRUE, sep = '\t')
@@ -21,11 +19,11 @@ samples <- tpms_df$Sample
 tpms_df <- tpms_df[, !colnames(tpms_df) %in% "Sample"]
 rownames(tpms_df) <- samples
 
-dendrogram_cut <- tpms_df$dendrogram_cut
+dendrogram_cut <- tpms_df$basal_vs_all
 dendrogram_label <- tpms_df$dendrogram_label
 
 # Step 4: Separate gene expression data and subtype labels
-gene_data <- tpms_df[, !colnames(tpms_df) %in% c("dendrogram_cut", "dendrogram_label")]
+gene_data <- tpms_df[, !colnames(tpms_df) %in% c("basal_vs_all", "dendrogram_label", "basal_ne_vs_lum")]
 
 # Verify that row names of gene_data match tpms_df
 head(rownames(gene_data))  # Should match the sample names
@@ -41,7 +39,7 @@ gene_data <- t(gene_data)
 
 ```{r}
 
-classifier_label <-'dendrogram_label'
+classifier_label <-'basal_vs_all'
 unique_classes <- unique(tpms_df[[classifier_label]])
 
 # Step 2: Extract class labels
@@ -80,7 +78,7 @@ training_samples <- sample(1:n, size = floor(n * 0.7))
 
 # Create training and testing sets with first 1000 genes (rows)
 train <- usedDataset[, training_samples]
-test_2 <- usedDataset[, -training_samples]
+test <- usedDataset[, -training_samples]
 
 test_labels <- class_labels[-training_samples]
 train_labels <- class_labels[training_samples]
