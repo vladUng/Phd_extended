@@ -6,34 +6,31 @@ Compared with the other notebook, I am using more samples and basal_ne_vs_all
 
 ```{r}
 library(multiclassPairs)
-library(leukemiasEset, quietly = TRUE) 
 
-data(leukemiasEset) 
-knitr::kable(table(pData(leukemiasEset)[,"LeukemiaType"]))
 
 path <- '~/Developer/York/R/98TFs/98TFs_subtypes_aggFiltering_basal_vs_all_gc42.tsv'
 
 # Step 1: Read the CSV file
-tpms_df <- read.csv(file = path, header = TRUE, sep = '\t')
+tpms_df_basal_ne <- read.csv(file = path, header = TRUE, sep = '\t')
 
 # Step 2: Set the 'Sample' column as row names
-samples <- tpms_df$Sample
+samples <- tpms_df_basal_ne$Sample
 
 # Step 3: Remove the 'Sample' column
-tpms_df <- tpms_df[, !colnames(tpms_df) %in% "Sample"]
-rownames(tpms_df) <- samples
+tpms_df_basal_ne <- tpms_df_basal_ne[, !colnames(tpms_df_basal_ne) %in% "Sample"]
+rownames(tpms_df_basal_ne) <- samples
 
-dendrogram_cut <- tpms_df$basal_ne_vs_lum
-dendrogram_label <- tpms_df$dendrogram_label
+dendrogram_cut <- tpms_df_basal_ne$basal_ne_vs_lum
+dendrogram_label <- tpms_df_basal_ne$dendrogram_label
 
 # Step 4: Separate gene expression data and subtype labels
-gene_data <- tpms_df[, !colnames(tpms_df) %in% c("basal_vs_all", "dendrogram_label", "basal_ne_vs_lum")]
+gene_data <- tpms_df_basal_ne[, !colnames(tpms_df_basal_ne) %in% c("basal_vs_all", "dendrogram_label", "basal_ne_vs_lum")]
 
 # Verify that row names of gene_data match tpms_df
 head(rownames(gene_data))  # Should match the sample names
 
 # Transpose the gene_data to make samples columns and genes rows
-gene_data <- t(gene_data)
+gene_data_basal_ne <- t(gene_data)
 
 ```
 
@@ -44,24 +41,24 @@ gene_data <- t(gene_data)
 ```{r}
 
 classifier_label <-'basal_ne_vs_lum'
-unique_classes <- unique(tpms_df[[classifier_label]])
+unique_classes_basal_ne <- unique(tpms_df_basal_ne[[classifier_label]])
 
 # Step 2: Extract class labels
 # Use 'dendrogram_cut' as the class labels
-class_labels <- as.factor(tpms_df[[classifier_label]])
+class_labels_basal_ne <- as.factor(tpms_df_basal_ne[[classifier_label]])
 
 # Check dimensions to confirm alignment
-if (ncol(gene_data) != length(class_labels)) {
+if (ncol(gene_data_basal_ne) != length(class_labels_basal_ne)) {
   stop("Number of samples in 'gene_data' and 'class_labels' do not match after transposing.")
 }
 
 # Step 3: Create the data object without platform labels
-data_object <- ReadData(Data = gene_data,
-                        Labels = class_labels,
+data_object_basal_ne <- ReadData(Data = gene_data_basal_ne,
+                        Labels = class_labels_basal_ne,
                         verbose = FALSE)
 
 # View the created object
-print(data_object)
+print(data_object_basal_ne)
 
 
 ```
@@ -69,7 +66,7 @@ print(data_object)
 ```{r}
 
 # Use your dataset
-usedDataset <- gene_data
+usedDataset <- gene_data_basal_ne
 
 # Get the number of samples (columns)
 n <- ncol(usedDataset)
@@ -81,18 +78,18 @@ set.seed(1234)
 training_samples <- sample(1:n, size = floor(n * 0.7))
 
 # Create training and testing sets with first 1000 genes (rows)
-train <- usedDataset[, training_samples]
-test <- usedDataset[, -training_samples]
+train_basal_ne <- usedDataset[, training_samples]
+test_basal_ne <- usedDataset[, -training_samples]
 
-test_labels <- class_labels[-training_samples]
-train_labels <- class_labels[training_samples]
+test_labels_basal_ne <- class_labels_basal_ne[-training_samples]
+train_labels_basal_ne <- class_labels_basal_ne[training_samples]
 
 # Step 2: Ensure no shared samples between training and testing sets
 # Here, columns represent samples, so we check the column names
-shared_samples <- sum(colnames(test) %in% colnames(train)) == 0
+shared_samples <- sum(colnames(test_basal_ne) %in% colnames(train_basal_ne)) == 0
 
-train_object <- ReadData(Data = train,
-                         Labels = train_labels,
+train_object_basal_ne <- ReadData(Data = train_basal_ne,
+                         Labels = train_labels_basal_ne,
                          verbose = TRUE)
 
 # Print the check result
@@ -113,13 +110,13 @@ Using option 2 with Dunn's test on ranked that as it was recommended to give mor
 # let's go with gene filtering using one_vs_one option
 # for featureNo argument, a sufficient number of returned features is 
 # recommended if large number of rules is used in the downstream training steps.
-filtered_genes <- filter_genes_TSP(data_object = train_object,
+filtered_genes_basal_ne <- filter_genes_TSP(data_object = train_object_basal_ne,
                                    filter = "one_vs_one",
                                    platform_wise = FALSE,
-                                   featureNo = 5000,
+                                   featureNo = 1000,
                                    UpDown = TRUE,
                                    verbose = TRUE)
-filtered_genes
+filtered_genes_basal_ne
 
 ```
 
@@ -128,42 +125,42 @@ filtered_genes
 ```{r}
 
 # Let's train our model
-classifier <- train_one_vs_rest_TSP(data_object = train_object,
-                                    filtered_genes = filtered_genes,
+classifier_basal_ne <- train_one_vs_rest_TSP(data_object = train_object_basal_ne,
+                                    filtered_genes = filtered_genes_basal_ne,
                                     k_range = 5:50,
-                                    include_pivot = FALSE,
+                                    include_pivot = TRUE,
                                     one_vs_one_scores = TRUE,
                                     platform_wise_scores = FALSE,
                                     seed = 1234,
                                     verbose = FALSE)
-classifier
+classifier_basal_ne
 
 ```
 
 # Prediction
 
-## Initial test
+## Run Prediction
 
 ```{r}
 
 # apply on the training data
 # To have the classes in output in specific order, we can use classes argument
-results_train <- predict_one_vs_rest_TSP(classifier = classifier,
-                                         Data = train_object,
+results_train_basal_ne <- predict_one_vs_rest_TSP(classifier = classifier_basal_ne,
+                                         Data = train_object_basal_ne,
                                          tolerate_missed_genes = TRUE,
                                          weighted_votes = TRUE,
-                                         classes =  unique_classes,
+                                         classes =  unique_classes_basal_ne,
                                          verbose = TRUE)
 
 # apply on the testing data
-results_test <- predict_one_vs_rest_TSP(classifier = classifier,
-                                        Data = test,
+results_test_basal_ne <- predict_one_vs_rest_TSP(classifier = classifier_basal_ne,
+                                        Data = test_basal_ne,
                                         tolerate_missed_genes = TRUE,
                                         weighted_votes = TRUE,
-                                        classes= unique_classes,
+                                        classes= unique_classes_basal_ne,
                                         verbose = TRUE)
 # get a look over the scores in the testing data
-knitr::kable(head(results_test))
+knitr::kable(head(results_test_basal_ne))
 
 ```
 
@@ -172,10 +169,10 @@ knitr::kable(head(results_test))
 ```{r}
 
 # Confusion Matrix and Statistics on training data
-caret::confusionMatrix(data = factor(results_train$max_score, 
-                                     levels = unique_classes),
-                       reference = factor(train_object$data$Labels, 
-                                          levels = unique_classes),
+caret::confusionMatrix(data = factor(results_train_basal_ne$max_score, 
+                                     levels = unique_classes_basal_ne),
+                       reference = factor(train_object_basal_ne$data$Labels, 
+                                          levels = unique_classes_basal_ne),
                        mode="everything")
 ```
 
@@ -185,23 +182,25 @@ caret::confusionMatrix(data = factor(results_train$max_score,
 
 # Extract sample names from the columns of the test object
 # Step 1: Extract sample names from the columns of the test object
-test_samples <- colnames(test)
+classifier_label <-'basal_ne_vs_lum'
 
-# Step 2: Extract the labels for these samples from tpms_df
-test_labels <- tpms_df[test_samples, classifier_label]
+test_samples_basal_ne <- colnames(test_basal_ne)
+
+# Step 2: Extract the labels for these samples from tpms_df_basal_ne
+test_labels <- tpms_df_basal_ne[test_samples_basal_ne, classifier_label]
 
 # Step 3: Convert test_labels to a factor with the correct levels
-test_labels <- as.factor(test_labels)
+test_labels_basal_ne <- as.factor(test_labels)
 
 # Step 4: Ensure predicted_labels has the same levels as test_labels
-common_levels <- union(levels(test_labels), unique(train_object$Labels))
+common_levels <- union(levels(test_labels_basal_ne), unique(train_object_basal_ne$Labels))
 
 # test_labels <- factor(test_labels, levels = common_levels)
-predicted_labels <- factor(results_test$max_score, levels = common_levels)
+predicted_labels_basal_ne <- factor(results_test_basal_ne$max_score, levels = common_levels)
 
 # Step 5: Compute the confusion matrix
-confusion_matrix <- caret::confusionMatrix(data = predicted_labels,
-                                           reference = test_labels,
+confusion_matrix <- caret::confusionMatrix(data = predicted_labels_basal_ne,
+                                           reference = test_labels_basal_ne,
                                            mode = "everything")
 
 # Print the confusion matrix
@@ -217,12 +216,12 @@ print(confusion_matrix)
 ```{r}
 
 # plot for the rules and scores in the training data
-plot_binary_TSP(Data = train_object, # we are using the data object here
-                classifier = classifier, 
-                prediction = results_train, 
-                classes = unique_classes,
+plot_binary_TSP(Data = train_object_basal_ne, # we are using the data object here
+                classifier = classifier_basal_ne, 
+                prediction = results_train_basal_ne, 
+                classes = unique_classes_basal_ne,
                 #margin = c(0,5,0,10),
-                title = "Training data")
+                title = "Sc/Ne, Basall splits - Training")
 
 ```
 
@@ -231,13 +230,151 @@ plot_binary_TSP(Data = train_object, # we are using the data object here
 ```{r}
 
 # plot for the rules and scores in the testing data
-plot_binary_TSP(Data = test, # ExpressionSet
-                ref=test_labels,
-                classifier = classifier, 
-                prediction = results_test, 
-                classes = unique_classes,
-                title = "Testing data"#, 
+plot_binary_TSP(Data = test_basal_ne, # ExpressionSet
+                ref=test_labels_basal_ne,
+                classifier = classifier_basal_ne, 
+                prediction = results_test_basal_ne, 
+                classes = unique_classes_basal_ne,
+                title = "Sc/Ne, Basall splits - Testing data",
                 #margin = c(0,5,0,10)
                 )
+
+print(classifier_basal_ne$classifiers$`small-basal`$TSPs)
+
+print(classifier_basal_ne$classifiers$`large-basal`$TSPs)
+
+print(classifier_basal_ne$classifiers$`mes-like`$TSPs)
+
+```
+
+### Export data
+
+```{r}
+
+# Initialize an empty list to store results
+flattened_classifier <- list()
+
+# Loop through each class in the classifier
+for(class_name in names(classifier_basal_ne$classifiers)) {
+  
+  # Extract the TSPs for the current class
+  tsp_data <- classifier_basal_ne$classifiers[[class_name]]$TSPs
+  
+  # Convert TSPs into a data frame
+  tsp_df <- as.data.frame(tsp_data)
+  
+  # Add a column to identify the class
+  tsp_df$class <- class_name
+  
+  # Append to the list
+  flattened_classifier[[class_name]] <- tsp_df
+}
+
+# Combine all classes into a single data frame
+final_classifier_df <- do.call(rbind, flattened_classifier)
+
+# Export to CSV
+write.csv(final_classifier_df, file = "classifier_rules_small_ne.csv", row.names = FALSE)
+```
+
+# Test on Lund
+
+```{r}
+
+#import the data
+
+path <- '~/Developer/York/R/Lund2023/prcsd_scaled_lund265.tsv'
+
+# Step 1: Read the CSV file
+tpms_df_lund265 <- read.csv(file = path, header = TRUE, sep = '\t')
+
+rownames(tpms_df_lund265) <- tpms_df_lund265$Sample
+
+# Step 4: Separate gene expression data and subtype labels
+lund_data <- tpms_df_lund265[, !colnames(tpms_df_lund265) %in% c('RNA_5c', 'RNA_7c', 'OOB_and_predictions_7c', 'predictions_Lund2017', 'Sample')]
+
+lund_data <- t(lund_data)
+
+# Verify that row names of lund_data match tpms_df
+head(rownames(lund_data))  # Should match the sample names
+
+
+```
+
+## Data prep
+
+```{r}
+
+lund_col <-'RNA_7c'
+lund_uniq_classes <- unique(tpms_df_lund265[[lund_col]])
+
+# Step 2: Extract class labels
+# Use 'dendrogram_cut' as the class labels
+lund_classes <- as.factor(tpms_df_lund265[[lund_col]])
+
+
+# Check dimensions to confirm alignment
+if (ncol(lund_data) != length(lund_classes)) {
+  stop("Number of samples in 'lund_data' and 'class_labels' do not match after transposing.")
+}
+
+# Step 3: Create the data object without platform labels
+lund_obj <- ReadData(Data = lund_data,
+                        Labels = lund_classes,
+                        verbose = FALSE)
+
+lund_obj
+```
+
+
+## Predict
+
+
+```{r}
+
+results_lund <- predict_one_vs_rest_TSP(classifier = classifier_basal_ne,
+                                        Data = lund_data,
+                                        tolerate_missed_genes = TRUE,
+                                        weighted_votes = TRUE,
+                                        classes= unique_classes_basal_ne,
+                                        verbose = TRUE)
+# get a look over the scores in the testing data
+knitr::kable(head(results_lund))
+
+
+
+lund_labels <- colnames(lund_data)
+
+# Step 2: Extract the labels for these samples from tpms_df_basal_ne
+lund_labels <- tpms_df_lund265[lund_labels, lund_col]
+
+# Step 3: Convert test_labels to a factor with the correct levels
+lund_labels <- as.factor(lund_labels)
+```
+
+
+
+## Plotting the data
+
+```{r}
+#rmarkdown::render('singleSampleClassifier_basal_ne_vs_all.Rmd')
+
+#random_list <- sample(c('Rest', 'small-basal'), size = length(lund_labels), replace = TRUE)
+
+
+# plot for the rules and scores in the testing data
+custom_plot_binary_TSP(Data = lund_data, # ExpressionSet
+                #ref=lund_labels,
+                top_anno='prediction',
+                #ref=results_lund$max_score,
+                classifier = classifier_basal_ne, 
+                prediction = results_lund, 
+                classes = unique_classes_basal_ne,
+                show_ref = FALSE,
+                title = "Sc/Ne, Basall splits - Lund data",
+                #margin = c(0,5,0,10)
+)
+
+
 
 ```
