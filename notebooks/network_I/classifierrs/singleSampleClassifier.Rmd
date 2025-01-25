@@ -4,10 +4,6 @@ This is an adapted version of the work from [Marzouka & Pontus](https://github.c
 
 ```{r}
 library(multiclassPairs)
-library(leukemiasEset, quietly = TRUE) 
-
-data(leukemiasEset) 
-knitr::kable(table(pData(leukemiasEset)[,"LeukemiaType"]))
 
 path <- '~/Developer/York/R/98TFs/98TFs_subtypes_aggFiltering_gc42.tsv'
 
@@ -66,7 +62,46 @@ print(data_object)
 
 ```{r}
 
-# Use your dataset
+if (FALSE) {
+  # Use your dataset
+  usedDataset <- gene_data
+  
+  # Get the number of samples (columns)
+  n <- ncol(usedDataset)
+  
+  # Set seed for reproducibility
+  set.seed(1234)
+  
+  # Step 1: Split samples into training (60%) and testing (40%)
+  training_samples <- sample(1:n, size = floor(n * 0.7))
+  
+  # Create training and testing sets with first 1000 genes (rows)
+  train <- usedDataset[, training_samples]
+  test <- usedDataset[, -training_samples]
+  
+  test_labels <- class_labels[-training_samples]
+  train_labels <- class_labels[training_samples]
+  
+  # Step 2: Ensure no shared samples between training and testing sets
+  # Here, columns represent samples, so we check the column names
+  shared_samples <- sum(colnames(test) %in% colnames(train)) == 0
+  
+  train_object <- ReadData(Data = train,
+                           Labels = train_labels,
+                           verbose = TRUE)
+  
+  # Print the check result
+  if (shared_samples) {
+    cat("No shared samples between training and testing datasets. Splits are clean.\n")
+  } else {
+    cat("Warning: Shared samples exist between training and testing datasets.\n")
+  }
+}
+
+```
+### Split by sample
+
+```{r}
 usedDataset <- gene_data
 
 # Get the number of samples (columns)
@@ -75,23 +110,45 @@ n <- ncol(usedDataset)
 # Set seed for reproducibility
 set.seed(1234)
 
-# Step 1: Split samples into training (60%) and testing (40%)
-training_samples <- sample(1:n, size = floor(n * 0.7))
+# Step 1: Perform stratified split for training (70%) and testing (30%) for each group
+# Assuming `class_labels_basal_ne` is a factor with groups corresponding to each sample
+train_indices <- list()
+test_indices <- list()
 
-# Create training and testing sets with first 1000 genes (rows)
-train <- usedDataset[, training_samples]
-test_2 <- usedDataset[, -training_samples]
+# Stratified sampling loop for each unique label in `class_labels_basal_ne`
+for (group in unique(class_labels)) {
+  # Get indices of samples belonging to the current group
+  group_samples <- which(class_labels == group)
+  
+  # Randomly sample 70% of the group for training
+  group_train <- sample(group_samples, size = floor(0.7 * length(group_samples)))
+  
+  # Remaining 30% goes to testing
+  group_test <- setdiff(group_samples, group_train)
+  
+  # Store the indices
+  train_indices[[group]] <- group_train
+  test_indices[[group]] <- group_test
+}
 
-test_labels <- class_labels[-training_samples]
-train_labels <- class_labels[training_samples]
+# Combine the indices for all groups
+train_samples <- unlist(train_indices)
+test_samples <- unlist(test_indices)
 
-# Step 2: Ensure no shared samples between training and testing sets
-# Here, columns represent samples, so we check the column names
-shared_samples <- sum(colnames(test) %in% colnames(train)) == 0
+# Step 2: Create training and testing sets
+train <- usedDataset[, train_samples]
+test <- usedDataset[, test_samples]
 
+train_labels <- class_labels[train_samples]
+test_labels <- class_labels[test_samples]
+
+# Step 3: Ensure no shared samples between training and testing sets
+shared_samples <- sum(colnames(test_labels) %in% colnames(train_labels)) == 0
+
+# Create training object
 train_object <- ReadData(Data = train,
-                         Labels = train_labels,
-                         verbose = TRUE)
+                                  Labels = train_labels,
+                                  verbose = TRUE)
 
 # Print the check result
 if (shared_samples) {
@@ -101,6 +158,8 @@ if (shared_samples) {
 }
 
 ```
+
+
 
 ## Gene filtering
 
@@ -114,7 +173,7 @@ Using option 2 with Dunn's test on ranked that as it was recommended to give mor
 filtered_genes <- filter_genes_TSP(data_object = train_object,
                                    filter = "one_vs_one",
                                    platform_wise = FALSE,
-                                   featureNo = 5000,
+                                   featureNo = 3000,
                                    UpDown = TRUE,
                                    verbose = TRUE)
 filtered_genes
@@ -129,7 +188,7 @@ filtered_genes
 classifier <- train_one_vs_rest_TSP(data_object = train_object,
                                     filtered_genes = filtered_genes,
                                     k_range = 5:50,
-                                    include_pivot = FALSE,
+                                    include_pivot = TRUE,
                                     one_vs_one_scores = TRUE,
                                     platform_wise_scores = FALSE,
                                     seed = 1234,
@@ -180,6 +239,8 @@ caret::confusionMatrix(data = factor(results_train$max_score,
 ## Confusion matrix
 
 ```{r}
+classifier_label <-'dendrogram_label'
+
 
 # Extract sample names from the columns of the test object
 # Step 1: Extract sample names from the columns of the test object
@@ -208,7 +269,7 @@ print(confusion_matrix)
 
 ```
 
-# Visusalisation
+# Visualisation
 
 ## Train data
 
@@ -219,9 +280,7 @@ plot_binary_TSP(Data = train_object, # we are using the data object here
                 classifier = classifier, 
                 prediction = results_train, 
                 classes = unique_classes,
-                #margin = c(0,5,0,10),
-                title = "Training data")
-
+                title = "378 samples - Training")
 ```
 
 ## Test data
@@ -234,8 +293,147 @@ plot_binary_TSP(Data = test, # ExpressionSet
                 classifier = classifier, 
                 prediction = results_test, 
                 classes = unique_classes,
-                title = "Testing data"#, 
+                title = "378 samples - Testing",
                 #margin = c(0,5,0,10)
                 )
+
+print(classifier$classifiers$`small-basal`$TSPs)
+
+print(classifier$classifiers$`large-basal`$TSPs)
+
+print(classifier$classifiers$`mes-like`$TSPs)
+
+```
+
+### Export rules
+
+```{r}
+
+
+# Initialize an empty list to store results
+flattened_classifier <- list()
+
+# Loop through each class in the classifier
+for(class_name in names(classifier$classifiers)) {
+  
+  # Extract the TSPs for the current class
+  tsp_data <- classifier$classifiers[[class_name]]$TSPs
+  
+  # Convert TSPs into a data frame
+  tsp_df <- as.data.frame(tsp_data)
+  
+  # Add a column to identify the class
+  tsp_df$class <- class_name
+  
+  # Append to the list
+  flattened_classifier[[class_name]] <- tsp_df
+}
+
+# Combine all classes into a single data frame
+final_classifier_df <- do.call(rbind, flattened_classifier)
+
+# Export to CSV
+write.csv(final_classifier_df, file = "classifier_rules_standard_2.csv", row.names = FALSE)
+```
+
+
+# Test on Lund
+
+```{r}
+
+#import the data
+
+path <- '~/Developer/York/R/Lund2023/prcsd_scaled_lund265.tsv'
+
+# Step 1: Read the CSV file
+tpms_df_lund265 <- read.csv(file = path, header = TRUE, sep = '\t')
+
+rownames(tpms_df_lund265) <- tpms_df_lund265$Sample
+
+# Step 4: Separate gene expression data and subtype labels
+lund_data <- tpms_df_lund265[, !colnames(tpms_df_lund265) %in% c('RNA_5c', 'RNA_7c', 'OOB_and_predictions_7c', 'predictions_Lund2017', 'Sample')]
+
+lund_data <- t(lund_data)
+
+# Verify that row names of lund_data match tpms_df
+head(rownames(lund_data))  # Should match the sample names
+
+
+```
+
+## Data prep
+
+```{r}
+
+lund_col <-'RNA_7c'
+lund_uniq_classes <- unique(tpms_df_lund265[[lund_col]])
+
+# Step 2: Extract class labels
+# Use 'dendrogram_cut' as the class labels
+lund_classes <- as.factor(tpms_df_lund265[[lund_col]])
+
+
+# Check dimensions to confirm alignment
+if (ncol(lund_data) != length(lund_classes)) {
+  stop("Number of samples in 'lund_data' and 'class_labels' do not match after transposing.")
+}
+
+# Step 3: Create the data object without platform labels
+lund_obj <- ReadData(Data = lund_data,
+                        Labels = lund_classes,
+                        verbose = FALSE)
+
+lund_obj
+```
+
+
+## Predict
+
+
+```{r}
+
+results_lund <- predict_one_vs_rest_TSP(classifier = classifier,
+                                        Data = lund_data,
+                                        tolerate_missed_genes = TRUE,
+                                        weighted_votes = TRUE,
+                                        classes= unique_classes,
+                                        verbose = TRUE)
+# get a look over the scores in the testing data
+knitr::kable(head(results_lund))
+
+lund_labels <- colnames(lund_data)
+
+# Step 2: Extract the labels for these samples from tpms_df_basal_ne
+lund_labels <- tpms_df_lund265[lund_labels, lund_col]
+
+# Step 3: Convert test_labels to a factor with the correct levels
+lund_labels <- as.factor(lund_labels)
+
+# Step 4: Export to a .tsv
+test_data <- cbind(Sample = rownames(results_lund), results_lund)
+
+write.table(test_data, file = "results/lund_results_v1.tsv", sep = "\t", row.names=FALSE)
+
+print(table(results_lund$max_score))
+
+```
+
+
+## Visualisation
+
+```{r}
+
+# plot for the rules and scores in the testing data
+custom_plot_binary_TSP(Data = lund_data, # ExpressionSet
+                #ref=lund_labels,
+                top_anno=c('prediction'),
+                #ref=results_lund$max_score,
+                classifier = classifier, 
+                prediction = results_lund, 
+                classes = unique_classes,
+                show_ref = FALSE,
+                title = "Sc/Ne, Basall splits - Lund data",
+                #margin = c(0,5,0,10)
+)
 
 ```

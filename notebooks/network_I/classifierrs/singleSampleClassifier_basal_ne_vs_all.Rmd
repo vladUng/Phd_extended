@@ -65,7 +65,47 @@ print(data_object_basal_ne)
 
 ```{r}
 
-# Use your dataset
+if(FALSE) {
+  # Use your dataset
+  usedDataset <- gene_data_basal_ne
+  
+  # Get the number of samples (columns)
+  n <- ncol(usedDataset)
+  
+  # Set seed for reproducibility
+  set.seed(1234)
+  
+  # Step 1: Split samples into training (60%) and testing (40%)
+  training_samples <- sample(1:n, size = floor(n * 0.7))
+  
+  # Create training and testing sets with first 1000 genes (rows)
+  train_basal_ne <- usedDataset[, training_samples]
+  test_basal_ne <- usedDataset[, -training_samples]
+  
+  test_labels_basal_ne <- class_labels_basal_ne[-training_samples]
+  train_labels_basal_ne <- class_labels_basal_ne[training_samples]
+  
+  # Step 2: Ensure no shared samples between training and testing sets
+  # Here, columns represent samples, so we check the column names
+  shared_samples <- sum(colnames(test_basal_ne) %in% colnames(train_basal_ne)) == 0
+  
+  train_object_basal_ne <- ReadData(Data = train_basal_ne,
+                           Labels = train_labels_basal_ne,
+                           verbose = TRUE)
+
+  # Print the check result
+  if (shared_samples) {
+    cat("No shared samples between training and testing datasets. Splits are clean.\n")
+  } else {
+    cat("Warning: Shared samples exist between training and testing datasets.\n")
+  }
+}
+```
+## Split by subtype
+
+```{r}
+
+# Use the dataset
 usedDataset <- gene_data_basal_ne
 
 # Get the number of samples (columns)
@@ -74,23 +114,45 @@ n <- ncol(usedDataset)
 # Set seed for reproducibility
 set.seed(1234)
 
-# Step 1: Split samples into training (60%) and testing (40%)
-training_samples <- sample(1:n, size = floor(n * 0.7))
+# Step 1: Perform stratified split for training (70%) and testing (30%) for each group
+# Assuming `class_labels_basal_ne` is a factor with groups corresponding to each sample
+train_indices <- list()
+test_indices <- list()
 
-# Create training and testing sets with first 1000 genes (rows)
-train_basal_ne <- usedDataset[, training_samples]
-test_basal_ne <- usedDataset[, -training_samples]
+# Stratified sampling loop for each unique label in `class_labels_basal_ne`
+for (group in unique(class_labels_basal_ne)) {
+  # Get indices of samples belonging to the current group
+  group_samples <- which(class_labels_basal_ne == group)
+  
+  # Randomly sample 70% of the group for training
+  group_train <- sample(group_samples, size = floor(0.7 * length(group_samples)))
+  
+  # Remaining 30% goes to testing
+  group_test <- setdiff(group_samples, group_train)
+  
+  # Store the indices
+  train_indices[[group]] <- group_train
+  test_indices[[group]] <- group_test
+}
 
-test_labels_basal_ne <- class_labels_basal_ne[-training_samples]
-train_labels_basal_ne <- class_labels_basal_ne[training_samples]
+# Combine the indices for all groups
+train_samples <- unlist(train_indices)
+test_samples <- unlist(test_indices)
 
-# Step 2: Ensure no shared samples between training and testing sets
-# Here, columns represent samples, so we check the column names
+# Step 2: Create training and testing sets
+train_basal_ne <- usedDataset[, train_samples]
+test_basal_ne <- usedDataset[, test_samples]
+
+train_labels_basal_ne <- class_labels_basal_ne[train_samples]
+test_labels_basal_ne <- class_labels_basal_ne[test_samples]
+
+# Step 3: Ensure no shared samples between training and testing sets
 shared_samples <- sum(colnames(test_basal_ne) %in% colnames(train_basal_ne)) == 0
 
+# Create training object
 train_object_basal_ne <- ReadData(Data = train_basal_ne,
-                         Labels = train_labels_basal_ne,
-                         verbose = TRUE)
+                                  Labels = train_labels_basal_ne,
+                                  verbose = TRUE)
 
 # Print the check result
 if (shared_samples) {
@@ -100,6 +162,8 @@ if (shared_samples) {
 }
 
 ```
+
+
 
 ## Gene filtering
 
@@ -132,7 +196,7 @@ classifier_basal_ne <- train_one_vs_rest_TSP(data_object = train_object_basal_ne
                                     one_vs_one_scores = TRUE,
                                     platform_wise_scores = FALSE,
                                     seed = 1234,
-                                    verbose = FALSE)
+                                    verbose = TRUE)
 classifier_basal_ne
 
 ```
@@ -357,15 +421,11 @@ lund_labels <- as.factor(lund_labels)
 ## Plotting the data
 
 ```{r}
-#rmarkdown::render('singleSampleClassifier_basal_ne_vs_all.Rmd')
-
-#random_list <- sample(c('Rest', 'small-basal'), size = length(lund_labels), replace = TRUE)
-
 
 # plot for the rules and scores in the testing data
 custom_plot_binary_TSP(Data = lund_data, # ExpressionSet
                 #ref=lund_labels,
-                top_anno='prediction',
+                top_anno=c('prediction'),
                 #ref=results_lund$max_score,
                 classifier = classifier_basal_ne, 
                 prediction = results_lund, 

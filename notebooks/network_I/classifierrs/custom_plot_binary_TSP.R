@@ -272,6 +272,7 @@ custom_plot_binary_TSP <-function (Data, classifier, ref = NULL, prediction = NU
         tmp_r <- C$classifiers[[i]]$TSPs
         tmp_binary <- D[tmp_r[, 1], select_samples, drop = FALSE] > 
           D[tmp_r[, 2], select_samples, drop = FALSE]
+        print(i)
         d <- dist(t(tmp_binary[, select_samples, drop = FALSE]), 
                   method = "euclidean")
         fit <- hclust(d, method = "ward.D2")
