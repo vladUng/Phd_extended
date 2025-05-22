@@ -1097,7 +1097,8 @@ class GraphToolExperiment(NetworkOutput):
 
         # matplotlib.use("cairo")
         # Combine colors from two color maps
-        default_clrs = list(matplotlib.cm.tab20.colors) + list(matplotlib.cm.tab20b.colors)
+        default_clrs = list(matplotlib.cm.tab20.colors) + \
+            list(matplotlib.cm.Pastel1.colors)+ list(matplotlib.cm.tab20b.colors)
 
         default_cm = matplotlib.cm.colors.ListedColormap(default_clrs)
 
